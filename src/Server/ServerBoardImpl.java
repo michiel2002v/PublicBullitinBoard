@@ -1,10 +1,14 @@
 package Server;
 
-import Client.Client;
+import Client.ClientInfo;
 import Common.ServerBoard;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.*;
 
 public class ServerBoardImpl extends UnicastRemoteObject implements ServerBoard {

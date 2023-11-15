@@ -32,13 +32,12 @@ public class Client {
     private final BulletinBoard bulletinBoard;
     private final ServerBoard server;
     private static MessageDigest digest;
-    private SecureRandom s;
+    private final SecureRandom s;
 
     private JTextArea chatArea;
     private JTextField newMessageField;
 
-    public Client (String username) throws RemoteException, NotBoundException, NoSuchAlgorithmException {
-        this.username = username;
+    public Client () throws RemoteException, NotBoundException, NoSuchAlgorithmException {
         this.clientInfoMap = new HashMap<>();
         digest = MessageDigest.getInstance("SHA-256");
         Registry myRegistry = LocateRegistry.getRegistry("localhost", 1234);
@@ -46,16 +45,16 @@ public class Client {
         server = (ServerBoard) myRegistry.lookup("ServerBoard");
         messageHistory = new HashMap<>();
         s = new SecureRandom();
+        userList = new JList<>();
     }
 
     // ------------------------------------------ THE CLIENT -----------------------------------------------------------
     public static void main(String[] args) throws NotBoundException, NoSuchAlgorithmException, RemoteException {
-        Client c = new Client("null");
+        Client c = new Client();
         c.run();
     }
 
     public void run(){
-        // TODO: wat zullen we hier doen
         JFrame frame = this.createUI();
         try {
             this.doLogin(frame);
@@ -65,7 +64,7 @@ public class Client {
     }
 
     public void send(String message, String toUser) throws RemoteException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
-        int nextIndex = s.nextInt()% bulletinBoard.getSize();
+        int nextIndex = s.nextInt(0, Integer.MAX_VALUE);
         byte[] nextIndexBytes = intToBytes(nextIndex);
         byte[] nextTagBytes = new byte[8];
         s.nextBytes(nextTagBytes);
@@ -112,7 +111,6 @@ public class Client {
         frame.setSize(width, height);
         frame.setLocationRelativeTo(null);
         frame.setLayout(new BorderLayout());
-
         // user list left sidebar
         JScrollPane userScrollPane = new JScrollPane();
         userScrollPane.setPreferredSize(new Dimension(150, height));
@@ -224,12 +222,11 @@ public class Client {
     }
 
     // ---------------------------------------- KEYS AND STUFF ---------------------------------------------------------
-
-    private static SecretKey generateAESKey(int keyLength) throws NoSuchAlgorithmException {
-        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-        keyGen.init(keyLength);
-        return keyGen.generateKey();
-    }
+//    private static SecretKey generateAESKey(int keyLength) throws NoSuchAlgorithmException {
+//        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+//        keyGen.init(keyLength);
+//        return keyGen.generateKey();
+//    }
 
     private static byte[] encryptAES(byte[] text, SecretKey key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         Cipher cipher = Cipher.getInstance("AES");

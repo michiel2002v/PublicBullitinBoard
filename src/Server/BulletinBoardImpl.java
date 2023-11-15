@@ -24,16 +24,11 @@ public class BulletinBoardImpl extends UnicastRemoteObject implements Common.Bul
     @Override
     public byte[] get(int index, byte[] tag) throws RemoteException {
         byte[] hashedTag = digest.digest(tag);
-        return bulletinBoard[index].get(hashedTag);
+        return bulletinBoard[index % bulletinBoard.length].get(hashedTag);
     }
 
     @Override
     public void write(int index, byte[] eMessageConcat, byte[] hashedTag) throws RemoteException {
-        bulletinBoard[index].put(hashedTag, eMessageConcat);
-    }
-
-    @Override
-    public int getSize(){
-        return numberCells;
+        bulletinBoard[index % bulletinBoard.length].put(hashedTag, eMessageConcat);
     }
 }

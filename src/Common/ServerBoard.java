@@ -5,7 +5,8 @@ import Client.ClientInfo;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.util.Map;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 
 public interface ServerBoard extends Remote {
     ClientInfo meet(String myUsername, String otherUsername) throws RemoteException, NoSuchAlgorithmException;

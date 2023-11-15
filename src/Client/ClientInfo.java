@@ -1,9 +1,9 @@
 package Client;
 
 import javax.crypto.SecretKey;
+import java.io.Serializable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class ClientInfo implements Serializable{
     private static final long serialVersionUID = 1L;
@@ -19,7 +19,6 @@ public class ClientInfo implements Serializable{
     private String username;
 
     public ClientInfo(String username){
-        scheduler = Executors.newScheduledThreadPool(1);
         this.username = username;
     }
 
@@ -77,6 +76,10 @@ public class ClientInfo implements Serializable{
 
     public ScheduledExecutorService getScheduler(){
         return scheduler;
+    }
+
+    public void setScheduler(){
+        scheduler = Executors.newScheduledThreadPool(1);
     }
 
     public int getWaitTime() {
