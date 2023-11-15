@@ -2,7 +2,6 @@ package Client;
 
 import Common.BulletinBoard;
 import Common.ServerBoard;
-import Server.Server;
 
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
@@ -27,11 +26,11 @@ import java.util.concurrent.TimeUnit;
 
 public class Client {
     private String username;
-    private Map<String, ClientInfo> clientInfoMap;
-    private Map<String, List<Message>> messageHistory;
+    private final Map<String, ClientInfo> clientInfoMap;
+    private final Map<String, List<Message>> messageHistory;
     private JList<String> userList;
-    private BulletinBoard bulletinBoard;
-    private ServerBoard server;
+    private final BulletinBoard bulletinBoard;
+    private final ServerBoard server;
     private static MessageDigest digest;
     private SecureRandom s;
 
@@ -45,6 +44,7 @@ public class Client {
         Registry myRegistry = LocateRegistry.getRegistry("localhost", 1234);
         bulletinBoard = (BulletinBoard) myRegistry.lookup("BulletinBoardServer");
         server = (ServerBoard) myRegistry.lookup("ServerBoard");
+        messageHistory = new HashMap<>();
         s = new SecureRandom();
     }
 
@@ -107,7 +107,7 @@ public class Client {
     private JFrame createUI(){
         int width = 600;
         int height = 600;
-        JFrame frame = new JFrame("Bulletin Board");
+        JFrame frame = new JFrame("Bulletin Board of " + username);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(width, height);
         frame.setLocationRelativeTo(null);
@@ -128,8 +128,10 @@ public class Client {
         newMessageField = new JTextField();
         JPanel bottomPanel = new JPanel(new BorderLayout());
         JButton sendButton = new JButton("Send");
+        JButton newButton = new JButton("New");
         bottomPanel.add(newMessageField, BorderLayout.CENTER);
         bottomPanel.add(sendButton, BorderLayout.EAST);
+        bottomPanel.add(newButton, BorderLayout.WEST);
         frame.add(bottomPanel, BorderLayout.SOUTH);
 
         sendButton.addActionListener(new ActionListener() {
@@ -160,6 +162,17 @@ public class Client {
             }
         });
 
+        newButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try{
+                    addFriend(frame);
+                } catch (Exception ex){
+                    ex.printStackTrace();
+                }
+            }
+        });
+
         userList.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
@@ -169,15 +182,30 @@ public class Client {
             }
         });
 
+        frame.setVisible(true);
         return frame;
     }
 
     private void doLogin(JFrame frame) throws NoSuchAlgorithmException, RemoteException {
         username = JOptionPane.showInputDialog(frame, "Choose an username: ");
-        while (!server.addUser(username, this)){
-            username = JOptionPane.showInputDialog(frame, "Choose an other username: ");
-        }
-        bump();
+    }
+
+    private void addFriend(JFrame frame) throws NoSuchAlgorithmException, RemoteException {
+        String myFriendsUsername = JOptionPane.showInputDialog(frame, "What is the username of you friend?");
+        ClientInfo clientInfo = server.meet(username, myFriendsUsername);
+        clientInfo.setScheduler();
+        clientInfo.getScheduler().scheduleAtFixedRate(() -> {
+            try {
+                receive(myFriendsUsername);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, 0, clientInfo.getWaitTime(), TimeUnit.MILLISECONDS);
+        clientInfoMap.put(myFriendsUsername, clientInfo);
+        Set<String> users = clientInfoMap.keySet();
+        String[] userArray = users.toArray(new String[users.size()]);
+        userList = new JList<>(userArray);
+        messageHistory.put(myFriendsUsername, new ArrayList<>());
     }
 
     private void handleSendMethod() throws NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, RemoteException, InvalidKeyException {
@@ -254,58 +282,53 @@ public class Client {
 
     // ------------------------------------------- BUMP ----------------------------------------------------------------
 
-    private void receiveState(String username, SecretKey toMeKey, SecretKey toThemKey,
-                              int toMeIndex, int toThemIndex, byte[] toMeTag, byte[] toThemTag){
-        ClientInfo c = new ClientInfo(username);
-        c.setSendKey(toThemKey);
-        c.setReceiveKey(toMeKey);
-        c.setReceiveIndex(toMeIndex);
-        c.setReceiveTag(toMeTag);
-        c.setSendTag(toThemTag);
-        c.setSendIndex(toThemIndex);
-        clientInfoMap.put(username, c);
-        Set<String> users = clientInfoMap.keySet();
-        String[] userArray = users.toArray(new String[users.size()]);
-        userList = new JList<>(userArray);
-    }
+//    private void receiveState(String username, SecretKey toMeKey, SecretKey toThemKey,
+//                              int toMeIndex, int toThemIndex, byte[] toMeTag, byte[] toThemTag){
+//        ClientInfo c = new ClientInfo(username);
+//        c.setSendKey(toThemKey);
+//        c.setReceiveKey(toMeKey);
+//        c.setReceiveIndex(toMeIndex);
+//        c.setReceiveTag(toMeTag);
+//        c.setSendTag(toThemTag);
+//        c.setSendIndex(toThemIndex);
+//        clientInfoMap.put(username, c);
+//        Set<String> users = clientInfoMap.keySet();
+//        String[] userArray = users.toArray(new String[users.size()]);
+//        userList = new JList<>(userArray);
+//    }
 
-    private void bump() throws NoSuchAlgorithmException, RemoteException{
-        Map<String, Client> otherClients = server.getClients();
-        for (Client otherClient : otherClients.values()){
-            SecretKey toMeKey = generateAESKey(256);
-            SecretKey toThemKey = generateAESKey(256);
-            int toMeIndex = s.nextInt() % bulletinBoard.getSize();
-            int toThemIndex = s.nextInt() % bulletinBoard.getSize();
-            byte[] toMeTag = new byte[8];
-            byte[] toThemTag = new byte[8];
-            s.nextBytes(toMeTag);
-            s.nextBytes(toThemTag);
-            otherClient.receiveState(username, toThemKey, toMeKey, toThemIndex, toMeIndex, toThemTag, toMeTag);
-
-            ClientInfo c = new ClientInfo(otherClient.getUsername());
-            c.setSendKey(toThemKey);
-            c.setReceiveKey(toMeKey);
-            c.setReceiveIndex(toMeIndex);
-            c.setReceiveTag(toMeTag);
-            c.setSendTag(toThemTag);
-            c.setSendIndex(toThemIndex);
-            c.setWaitTime(400);
-            c.getScheduler().scheduleAtFixedRate(() -> {
-                try {
-                    receive(c.getUsername());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }, 0, c.getWaitTime(), TimeUnit.MILLISECONDS);
-            clientInfoMap.put(otherClient.getUsername(), c);
-        }
-        Set<String> users = clientInfoMap.keySet();
-        String[] userArray = users.toArray(new String[users.size()]);
-        userList = new JList<>(userArray);
-    }
-
-    public String getUsername(){
-        return username;
-    }
-
+//    private void bump() throws NoSuchAlgorithmException, RemoteException{
+//        Map<String, Client> otherClients = server.getClients();
+//        for (Client otherClient : otherClients.values()){
+//            SecretKey toMeKey = generateAESKey(256);
+//            SecretKey toThemKey = generateAESKey(256);
+//            int toMeIndex = s.nextInt();
+//            int toThemIndex = s.nextInt();
+//            byte[] toMeTag = new byte[8];
+//            byte[] toThemTag = new byte[8];
+//            s.nextBytes(toMeTag);
+//            s.nextBytes(toThemTag);
+//            otherClient.receiveState(username, toThemKey, toMeKey, toThemIndex, toMeIndex, toThemTag, toMeTag);
+//
+//            ClientInfo c = new ClientInfo(otherClient.getUsername());
+//            c.setSendKey(toThemKey);
+//            c.setReceiveKey(toMeKey);
+//            c.setReceiveIndex(toMeIndex);
+//            c.setReceiveTag(toMeTag);
+//            c.setSendTag(toThemTag);
+//            c.setSendIndex(toThemIndex);
+//            c.setWaitTime(400);
+//            c.getScheduler().scheduleAtFixedRate(() -> {
+//                try {
+//                    receive(c.getUsername());
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            }, 0, c.getWaitTime(), TimeUnit.MILLISECONDS);
+//            clientInfoMap.put(otherClient.getUsername(), c);
+//        }
+//        Set<String> users = clientInfoMap.keySet();
+//        String[] userArray = users.toArray(new String[users.size()]);
+//        userList = new JList<>(userArray);
+//    }
 }

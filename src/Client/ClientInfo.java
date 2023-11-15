@@ -5,7 +5,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class ClientInfo {
+public class ClientInfo implements Serializable{
+    private static final long serialVersionUID = 1L;
+
     private SecretKey sendKey;
     private SecretKey receiveKey;
     private int sendIndex;
@@ -13,7 +15,7 @@ public class ClientInfo {
     private byte[] sendTag;
     private byte[] receiveTag;
     private int waitTime;
-    private ScheduledExecutorService scheduler;
+    private transient ScheduledExecutorService scheduler;
     private String username;
 
     public ClientInfo(String username){
