@@ -12,7 +12,7 @@ import java.security.SecureRandom;
 import java.util.*;
 
 public class ServerBoardImpl extends UnicastRemoteObject implements ServerBoard {
-    private Map<String, ClientInfo> meetingPoint;
+    private final Map<String, ClientInfo> meetingPoint;
     private final SecureRandom s;
 
     public ServerBoardImpl() throws RemoteException {
@@ -45,7 +45,7 @@ public class ServerBoardImpl extends UnicastRemoteObject implements ServerBoard 
         c1.setReceiveTag(toMeTag);
         c1.setSendTag(toYouTag);
         c1.setSendIndex(toYouIndex);
-        c1.setWaitTime(400);
+        c1.setWaitTime(500);
 
         ClientInfo c2 = new ClientInfo(myUsername);
         c2.setSendKey(toMeKey);
@@ -54,7 +54,7 @@ public class ServerBoardImpl extends UnicastRemoteObject implements ServerBoard 
         c2.setReceiveTag(toYouTag);
         c2.setSendTag(toMeTag);
         c2.setSendIndex(toMeIndex);
-        c2.setWaitTime(400);
+        c2.setWaitTime(500);
         meetingPoint.put(otherUsername+myUsername, c2);
         return c1;
     }

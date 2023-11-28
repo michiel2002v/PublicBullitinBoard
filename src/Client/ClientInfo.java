@@ -1,11 +1,13 @@
 package Client;
 
 import javax.crypto.SecretKey;
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class ClientInfo implements Serializable{
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private SecretKey sendKey;
@@ -16,7 +18,7 @@ public class ClientInfo implements Serializable{
     private byte[] receiveTag;
     private int waitTime;
     private transient ScheduledExecutorService scheduler;
-    private String username;
+    private final String username;
 
     public ClientInfo(String username){
         this.username = username;

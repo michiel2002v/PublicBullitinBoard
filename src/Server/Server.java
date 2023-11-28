@@ -1,10 +1,7 @@
 package Server;
 
-import Client.Client;
-
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.*;
 
 public class Server extends Thread{
 

@@ -1,8 +1,8 @@
 package Client;
 
 public class Message {
-    private String message;
-    private String sender;
+    private final String message;
+    private final String sender;
 
     public Message(String m, String s){
         message = m;
@@ -10,6 +10,6 @@ public class Message {
     }
 
     public String getFormat(){
-        return (sender + " :" + message);
+        return (sender + " :" + message + "\n");
     }
 }
