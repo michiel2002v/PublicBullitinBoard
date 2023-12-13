@@ -263,8 +263,6 @@ public class Client {
     private void addFriend(JFrame frame) throws NoSuchAlgorithmException, RemoteException {
         String myFriendsUsername = JOptionPane.showInputDialog(frame, "What is the username of you friend?");
         ClientInfo clientInfo = server.meet(username, myFriendsUsername);
-        System.out.println("initial tags: sendTag:" + new String(clientInfo.getSendTag())
-                + "\n\treceiveTag: " + new String(clientInfo.getReceiveTag()));
         clientInfo.setScheduler();
         clientInfo.getScheduler().scheduleAtFixedRate(() -> {
             try {
@@ -291,7 +289,7 @@ public class Client {
         String user = userList.getSelectedValue();
         chatArea.setText("");
         for (Message message : messageHistory.get(user)){
-            chatArea.append(message.getFormat() + " \n");
+            chatArea.append(message.getFormat());
         }
     }
 
