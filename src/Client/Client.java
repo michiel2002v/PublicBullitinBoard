@@ -40,9 +40,9 @@ public class Client {
     private JTextArea chatArea;
     private JTextField newMessageField;
 
-    private int amountCoins;
+    private List<Integer> coins;
+    private int resetCoin;
     private int maxSendsPerSecond;
-    private final ScheduledExecutorService coinRestScheduler;
     private final ScheduledExecutorService sendsPerSecondScheduler;
 
     public Client () throws RemoteException, NotBoundException, NoSuchAlgorithmException {
@@ -55,12 +55,7 @@ public class Client {
         s = new SecureRandom();
         userListModel = new DefaultListModel<>();
         userList = new JList<>(userListModel);
-        amountCoins = 500;
         maxSendsPerSecond = 3;
-        coinRestScheduler = Executors.newScheduledThreadPool(1);
-        coinRestScheduler.scheduleAtFixedRate(() -> {
-            amountCoins = 500;
-        }, 0, 1, TimeUnit.DAYS);
         sendsPerSecondScheduler = Executors.newScheduledThreadPool(1);
         sendsPerSecondScheduler.scheduleAtFixedRate(() -> {
             maxSendsPerSecond = 3;
@@ -98,21 +93,50 @@ public class Client {
         // encrypt message
         ClientInfo clientInfo = clientInfoMap.get(toUser);
         byte[] eMessageConcat = encryptAES(messageConcat, clientInfo.getSendKey());
-
+        boolean sendSuccessful = true;
         // put in bulletinboard
-        bulletinBoard.write(clientInfo.getSendIndex(), eMessageConcat, digest.digest(clientInfo.getSendTag()));
+        if(!coins.isEmpty()) {
+            if (!bulletinBoard.write(clientInfo.getSendIndex(), eMessageConcat,
+                    digest.digest(clientInfo.getSendTag()), coins.remove(0))) {
+                List<Integer> receivedCoins = bulletinBoard.getNewCoins(resetCoin);
+                if(receivedCoins != null) {
+                    resetCoin = receivedCoins.remove(receivedCoins.size() - 1);
+                    coins = receivedCoins;
+                    bulletinBoard.write(clientInfo.getSendIndex(), eMessageConcat,
+                            digest.digest(clientInfo.getSendTag()), coins.remove(0));
+                }
+                else {
+                    sendSuccessful = false;
+                }
+            }
+        }
+        else {
+            List<Integer> receivedCoins = bulletinBoard.getNewCoins(resetCoin);
+            if(receivedCoins != null) {
+                resetCoin = receivedCoins.remove(receivedCoins.size() - 1);
+                coins = receivedCoins;
+                bulletinBoard.write(clientInfo.getSendIndex(), eMessageConcat,
+                        digest.digest(clientInfo.getSendTag()), coins.remove(0));
+            }
+            else {
+                 sendSuccessful = false;
+            }
+        }
 
-        // update clientInfo for next message
-        clientInfo.setSendIndex(nextIndex);
-        clientInfo.setSendTag(nextTagBytes);
-        clientInfo.setSendKey(KDF(clientInfo.getSendKey()));
+        if (sendSuccessful) {
+            // update clientInfo for next message
+            clientInfo.setSendIndex(nextIndex);
+            clientInfo.setSendTag(nextTagBytes);
+            clientInfo.setSendKey(KDF(clientInfo.getSendKey()));
 
-        // save message in history
-        Message m = new Message(message, username);
-        messageHistory.get(toUser).add(m);
-        chatArea.append(m.getFormat());
-
-        amountCoins--;
+            // save message in history
+            Message m = new Message(message, username);
+            messageHistory.get(toUser).add(m);
+            chatArea.append(m.getFormat());
+        }
+        else{
+            chatArea.append("BAAAH no coins\n");
+        }
         maxSendsPerSecond--;
     }
 
@@ -120,8 +144,13 @@ public class Client {
         ClientInfo clientInfo = clientInfoMap.get(fromUser);
         byte[] eMessageConcat = bulletinBoard.get(clientInfo.getReceiveIndex(), clientInfo.getReceiveTag());
         if (eMessageConcat != null){
+            ByteBuffer buffer = ByteBuffer.wrap(eMessageConcat);
+            int coin = buffer.getInt();
+            coins.add(coin);
+            eMessageConcat = new byte[buffer.remaining()];
+            buffer.get(eMessageConcat);
             byte[] messageConcat = decryptAES(eMessageConcat, clientInfo.getReceiveKey());
-            ByteBuffer buffer = ByteBuffer.wrap(messageConcat);
+            buffer = ByteBuffer.wrap(messageConcat);
             int nextIndex = buffer.getInt();
             byte[] nextTag = new byte[8];
             buffer.get(nextTag);
@@ -134,7 +163,6 @@ public class Client {
             System.out.println(m.getFormat());
             if (!userList.isSelectionEmpty() && userList.getSelectedValue().equals(fromUser)) chatArea.append(m.getFormat());
             messageHistory.get(fromUser).add(m);
-            amountCoins++;
         }
     }
 
@@ -223,6 +251,12 @@ public class Client {
 
     private void doLogin(JFrame frame) throws NoSuchAlgorithmException, RemoteException {
         username = JOptionPane.showInputDialog(frame, "Choose an username: ");
+        List<Integer> receivedCoins;
+        while((receivedCoins = bulletinBoard.login(username)) == null){
+            username = JOptionPane.showInputDialog(frame, "Choose an username: ");
+        }
+        resetCoin = receivedCoins.remove(receivedCoins.size() - 1);
+        coins = receivedCoins;
         frame.setTitle("Bulletin Board of " + username);
     }
 
@@ -246,7 +280,7 @@ public class Client {
     }
 
     private void handleSendMethod() throws NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, RemoteException, InvalidKeyException {
-        if (userList.isSelectionEmpty() || amountCoins <= 0 || maxSendsPerSecond <= 0) return;
+        if (userList.isSelectionEmpty() || maxSendsPerSecond <= 0) return;
         String outgoingMessage = newMessageField.getText();
         String toUser = userList.getSelectedValue();
         this.send(outgoingMessage, toUser);
@@ -262,11 +296,6 @@ public class Client {
     }
 
     // ---------------------------------------- KEYS AND STUFF ---------------------------------------------------------
-//    private static SecretKey generateAESKey(int keyLength) throws NoSuchAlgorithmException {
-//        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-//        keyGen.init(keyLength);
-//        return keyGen.generateKey();
-//    }
 
     private static byte[] encryptAES(byte[] text, SecretKey key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         Cipher cipher = Cipher.getInstance("AES");
@@ -313,56 +342,4 @@ public class Client {
 
         return result;
     }
-
-    // ------------------------------------------- BUMP ----------------------------------------------------------------
-
-//    private void receiveState(String username, SecretKey toMeKey, SecretKey toThemKey,
-//                              int toMeIndex, int toThemIndex, byte[] toMeTag, byte[] toThemTag){
-//        ClientInfo c = new ClientInfo(username);
-//        c.setSendKey(toThemKey);
-//        c.setReceiveKey(toMeKey);
-//        c.setReceiveIndex(toMeIndex);
-//        c.setReceiveTag(toMeTag);
-//        c.setSendTag(toThemTag);
-//        c.setSendIndex(toThemIndex);
-//        clientInfoMap.put(username, c);
-//        Set<String> users = clientInfoMap.keySet();
-//        String[] userArray = users.toArray(new String[users.size()]);
-//        userList = new JList<>(userArray);
-//    }
-
-//    private void bump() throws NoSuchAlgorithmException, RemoteException{
-//        Map<String, Client> otherClients = server.getClients();
-//        for (Client otherClient : otherClients.values()){
-//            SecretKey toMeKey = generateAESKey(256);
-//            SecretKey toThemKey = generateAESKey(256);
-//            int toMeIndex = s.nextInt();
-//            int toThemIndex = s.nextInt();
-//            byte[] toMeTag = new byte[8];
-//            byte[] toThemTag = new byte[8];
-//            s.nextBytes(toMeTag);
-//            s.nextBytes(toThemTag);
-//            otherClient.receiveState(username, toThemKey, toMeKey, toThemIndex, toMeIndex, toThemTag, toMeTag);
-//
-//            ClientInfo c = new ClientInfo(otherClient.getUsername());
-//            c.setSendKey(toThemKey);
-//            c.setReceiveKey(toMeKey);
-//            c.setReceiveIndex(toMeIndex);
-//            c.setReceiveTag(toMeTag);
-//            c.setSendTag(toThemTag);
-//            c.setSendIndex(toThemIndex);
-//            c.setWaitTime(400);
-//            c.getScheduler().scheduleAtFixedRate(() -> {
-//                try {
-//                    receive(c.getUsername());
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            }, 0, c.getWaitTime(), TimeUnit.MILLISECONDS);
-//            clientInfoMap.put(otherClient.getUsername(), c);
-//        }
-//        Set<String> users = clientInfoMap.keySet();
-//        String[] userArray = users.toArray(new String[users.size()]);
-//        userList = new JList<>(userArray);
-//    }
 }
