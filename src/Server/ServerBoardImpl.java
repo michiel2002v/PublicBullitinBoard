@@ -26,6 +26,9 @@ public class ServerBoardImpl extends UnicastRemoteObject implements ServerBoard 
     }
 
     public ClientInfo meet(String myUsername, String otherUsername) throws NoSuchAlgorithmException {
+        if(myUsername.equals(otherUsername)){
+            return null;
+        }
         if (meetingPoint.containsKey(myUsername+otherUsername)){
             return meetingPoint.remove(myUsername+otherUsername);
         }

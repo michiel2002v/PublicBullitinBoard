@@ -263,18 +263,20 @@ public class Client {
     private void addFriend(JFrame frame) throws NoSuchAlgorithmException, RemoteException {
         String myFriendsUsername = JOptionPane.showInputDialog(frame, "What is the username of you friend?");
         ClientInfo clientInfo = server.meet(username, myFriendsUsername);
-        clientInfo.setScheduler();
-        clientInfo.getScheduler().scheduleAtFixedRate(() -> {
-            try {
-                receive(myFriendsUsername);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }, 0, clientInfo.getWaitTime(), TimeUnit.MILLISECONDS);
-        clientInfoMap.put(myFriendsUsername, clientInfo);
-        Set<String> users = clientInfoMap.keySet();
-        userListModel.addElement(myFriendsUsername);
-        messageHistory.put(myFriendsUsername, new ArrayList<>());
+        if(clientInfo != null) {
+            clientInfo.setScheduler();
+            clientInfo.getScheduler().scheduleAtFixedRate(() -> {
+                try {
+                    receive(myFriendsUsername);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }, 0, clientInfo.getWaitTime(), TimeUnit.MILLISECONDS);
+            clientInfoMap.put(myFriendsUsername, clientInfo);
+            Set<String> users = clientInfoMap.keySet();
+            userListModel.addElement(myFriendsUsername);
+            messageHistory.put(myFriendsUsername, new ArrayList<>());
+        }
     }
 
     private void handleSendMethod() throws NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, RemoteException, InvalidKeyException {
